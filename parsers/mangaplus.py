@@ -11,7 +11,7 @@ SECRET_KEY = "4Kin9vGg"
 APP_PARAMS = {
     "os": "android",
     "os_ver": "35",
-    "app_ver": 199
+    "app_ver": 235
 }
 
 def md5(string: str):
