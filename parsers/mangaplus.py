@@ -1,3 +1,10 @@
+# /// script
+# requires-python = ">=3.14"
+# dependencies = [
+#     "bbpb>=1.4.2",
+# ]
+# ///
+
 import jidouteki
 from jidouteki import *
 from jidouteki.utils import get
