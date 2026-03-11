@@ -48,7 +48,7 @@ class KingOfShojo(WebsiteParser):
         return self.fetch(f"/{series}-chapter-{chapter}")
     
     def fetch_series(self, series):
-        return self.fetch(f"/manga/{series}") # use v3
+        return self.fetch(f"/manga/{series}")
     
     @jidouteki.test({ "series": "the-grand-duke-is-mine"})     
     @jidouteki.map.series.chapters
@@ -90,6 +90,7 @@ class KingOfShojo(WebsiteParser):
         ret = []
         for el in d:
             url = el["src"]
-            # ret.append(self.proxy(url, headers={"referer": self.domain.url}))
-            ret.append(url)
+            parsed: ParseResult = urlparse(url)
+            if parsed.hostname == "cdn.kingofshojo.com":
+                ret.append(url)
         return ret
