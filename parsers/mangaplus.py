@@ -118,7 +118,7 @@ class Mangaplus(WebsiteParser):
     def chapters(self, series: str):
         details = self.fetch_title_details(series)
         
-        chapter_groups = get(details, "1.8.28")
+        chapter_groups = get(details, "1.8.38")
         chapter_data = [] 
         
         # chapter_groups might not be a list
