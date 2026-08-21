@@ -1,5 +1,6 @@
 from jidouteki import *
 import jidouteki
+from urllib.parse import urlparse, ParseResult
 
 class Rawkuma(WebsiteParser):
   @property
@@ -9,26 +10,39 @@ class Rawkuma(WebsiteParser):
       display_name = "Rawkuma",
       domains=[
         Domain("https://rawkuma.net/"),
-        Domain("https://rawkuma.com/"),
       ]
     )
+
+  def __init__(self, context: jidouteki.Jidouteki) -> None:
+     super().__init__(context)
+     self.session.headers.update({
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:153.0) Gecko/20100101 Firefox/153.0"
+     })
   
   @jidouteki.test(
-      "https://rawkuma.com/100-man-no-inochi-no-ue-ni-ore-wa-tatte-iru-chapter-94/", 
-      {"series": "100-man-no-inochi-no-ue-ni-ore-wa-tatte-iru","chapter": "94"}
+     "https://rawkuma.net/manga/game-sekai-no-mobu-akuyaku-ni-tensei-shita-node-last-bos-wo-mezashite-mita/",
+     {"series": "game-sekai-no-mobu-akuyaku-ni-tensei-shita-node-last-bos-wo-mezashite-mita"}
   )
   @jidouteki.test(
-      "https://rawkuma.com/manga/100-man-no-inochi-no-ue-ni-ore-wa-tatte-iru/", 
-      {"series": "100-man-no-inochi-no-ue-ni-ore-wa-tatte-iru"}
+     "https://rawkuma.net/manga/game-sekai-no-mobu-akuyaku-ni-tensei-shita-node-last-bos-wo-mezashite-mita/chapter-1.196705/",
+     {"series": "game-sekai-no-mobu-akuyaku-ni-tensei-shita-node-last-bos-wo-mezashite-mita", "chapter": "1.196705"}  
   )
   @jidouteki.map.match
   def match(self, url):
-    patterns =  (
-      r"https://rawkuma\.com/(?P<series>.*?)-chapter-(?P<chapter>.*?)(?:[/?].*|)$",
-      r"https://rawkuma\.com/manga/(?P<series>.*?)(?:[/?].*|)$"
-    )
-    
-    return jidouteki.utils.match_groups(patterns, url)
+    parsed_url: ParseResult = urlparse(url)
+        
+    domain = parsed_url.scheme + "://" + parsed_url.hostname + "/"
+
+    if not any([d.url == domain for d in self.meta.domains]):
+        return None
+
+    result = None
+    path = parsed_url.path.strip("/").split("/")
+    if len(path) >= 2 and path[0] == "manga":
+        result = {}
+        result["series"] = path[1]
+        if len(path) > 2: result["chapter"] = path[2].split("-")[-1]
+    return result
 
   def fetch_series(self, series):
     return self.fetch(f"/manga/{series}")
@@ -38,14 +52,17 @@ class Rawkuma(WebsiteParser):
   def chapters(self, series):
       d = self.fetch_series(series)
       LANG = { "manga": "ja", "manhwa": "ko", "manhua": "zh" }
-      type  = d.css(".tsinfo > .imptdt:nth-child(2) > a")[0].get_text()
+      type  = d.css("article section div div:nth-child(1) div:nth-last-child(1) .inline p")[0].get_text()
       lang =  LANG[type.lower()]
       
       ret = []
-      for el in d.css("#chapterlist li"):
+      for el in d.css("#chapter-list > div"):
+        chp_link = el.css.select_one("a")
+        matched = self.match(chp_link["href"])
+        
         chapter = Chapter(
-          params = { "chapter": el["data-num"]},
-          chapter =  el["data-num"],
+          params = { "chapter": matched["chapter"]},
+          chapter =  el["data-chapter-number"],
           language = lang
         )
         ret.append(chapter)
@@ -54,7 +71,7 @@ class Rawkuma(WebsiteParser):
   @jidouteki.test({"series": "100-man-no-inochi-no-ue-ni-ore-wa-tatte-iru"})
   @jidouteki.map.series.cover
   def cover(self, series):
-      d = self.fetch_series(series).css(".thumbook .thumb img")
+      d = self.fetch_series(series).css("[itemprop=image] img")
       for el in d:
         return el["src"]
 
@@ -63,23 +80,23 @@ class Rawkuma(WebsiteParser):
   @jidouteki.map.series.title
   def title(self, series):
       d = self.fetch_series(series)
-      d = d.css(".ts-breadcrumb.bixbox > div > span:last-child > a > span[itemprop=name]")
+      d = d.css("main article section h1[itemprop=name]")
       for el in d: 
-        return el.get_text("text")
+        return el.get_text("text").strip()
       return None
   
   @jidouteki.test(
-        {"series": "100-man-no-inochi-no-ue-ni-ore-wa-tatte-iru", "chapter": "31"}
+        {"series": "100-man-no-inochi-no-ue-ni-ore-wa-tatte-iru", "chapter": "31.4056"}
   )
   @jidouteki.map.images
   def images(self, series, chapter):
-      d = self.fetch(f"/{series}-chapter-{chapter}")
-      d = d.css("#readerarea img")
+      d = self.fetch(f"/manga/{series}/chapter-{chapter}")
+      d = d.css("section[data-image-data] img")
       
       ret = []
       for el in d:
          url = el["src"]
-         ret.append(self.proxy(url, headers={"referer": "https://rawkuma.com/"}))
+         ret.append(self.proxy(url, headers={"referer": self.domain.url}))
       return ret
       
   # search:
